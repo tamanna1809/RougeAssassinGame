@@ -4,6 +4,7 @@ public class PlayerStats : MonoBehaviour
 {
     [Header("Ammo")]
     public int ammo = 0;
+    public int shotgunAmmo = 0;
 
     private bool isDead;
 
@@ -14,10 +15,22 @@ public class PlayerStats : MonoBehaviour
         ammo += amount;
     }
 
+    public void AddShotgunAmmo(int amount)
+    {
+        shotgunAmmo += amount;
+    }
+
     public bool UseAmmo()
     {
         if (ammo <= 0) return false;
         ammo--;
+        return true;
+    }
+
+    public bool UseShotgunAmmo()
+    {
+        if (shotgunAmmo <= 0) return false;
+        shotgunAmmo--;
         return true;
     }
 
@@ -30,17 +43,14 @@ public class PlayerStats : MonoBehaviour
         if (ScreenShake.Instance != null)
             ScreenShake.Instance.Shake(0.3f, 0.3f);
 
-        // Hide player
         SpriteRenderer sr = GetComponent<SpriteRenderer>();
         if (sr != null) sr.enabled = false;
 
-        // Disable controls during death
         PlayerController controller = GetComponent<PlayerController>();
         if (controller != null) controller.enabled = false;
         PlayerCombat combat = GetComponent<PlayerCombat>();
         if (combat != null) combat.enabled = false;
 
-        // Stop movement
         Rigidbody2D rb = GetComponent<Rigidbody2D>();
         if (rb != null) rb.velocity = Vector2.zero;
 
@@ -51,6 +61,7 @@ public class PlayerStats : MonoBehaviour
     {
         isDead = false;
         ammo = 0;
+        shotgunAmmo = 0;
     }
 
     void TriggerDeath()

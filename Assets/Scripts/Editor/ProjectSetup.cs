@@ -16,9 +16,11 @@ public class ProjectSetup : EditorWindow
         CreateMaterials();
         CreatePlayerPrefab();
         CreateEnemyPrefab();
+        CreateBossPrefab();
         CreateMainMenuScene();
         CreateLevelScene("Level1", 4);
         CreateLevelScene("Level2", 6);
+        CreateLevelScene("Level3", 4);
         SetupBuildSettings();
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -507,6 +509,63 @@ public class ProjectSetup : EditorWindow
         Debug.Log("Enemy prefab created.");
     }
 
+    // ==================== BOSS PREFAB ====================
+
+    [MenuItem("Assassin/Create Boss Prefab")]
+    public static void CreateBossPrefab()
+    {
+        GameObject boss = new GameObject("Boss");
+        boss.tag = "Enemy";
+        boss.layer = 9; // Enemy layer
+
+        // Bigger sprite, purple/magenta color to stand out
+        SpriteRenderer sr = boss.AddComponent<SpriteRenderer>();
+        sr.sprite = CreateCircleSprite(64);
+        sr.color = new Color(0.8f, 0f, 1f, 1f); // purple
+        sr.sortingOrder = 12;
+        boss.transform.localScale = new Vector3(1.5f, 1.5f, 1f); // bigger than regular enemies
+
+        // Physics
+        Rigidbody2D rb = boss.AddComponent<Rigidbody2D>();
+        rb.gravityScale = 0f;
+        rb.freezeRotation = true;
+
+        CircleCollider2D col = boss.AddComponent<CircleCollider2D>();
+        col.radius = 0.4f;
+
+        // Boss controller
+        BossController bc = boss.AddComponent<BossController>();
+        bc.obstacleMask = (1 << 10) | (1 << 11);
+        bc.maxBossLives = 3;
+
+        // Vision cone — wider and longer than regular enemies
+        VisionCone vc = boss.AddComponent<VisionCone>();
+        vc.visionRange = 6f;
+        vc.visionAngle = 35f;
+        vc.obstacleLayer = (1 << 10) | (1 << 11);
+
+        Material visionMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/VisionConeMaterial.mat");
+        if (visionMat != null)
+            vc.coneMaterial = visionMat;
+
+        // Inner glow ring to make boss look distinct
+        GameObject ring = new GameObject("BossRing");
+        ring.transform.SetParent(boss.transform);
+        ring.transform.localPosition = Vector3.zero;
+        ring.transform.localScale = new Vector3(1.3f, 1.3f, 1f);
+        SpriteRenderer ringSr = ring.AddComponent<SpriteRenderer>();
+        ringSr.sprite = CreateCircleSprite(64);
+        ringSr.color = new Color(0.8f, 0f, 1f, 0.2f);
+        ringSr.sortingOrder = 11;
+
+        // Label and lives are created at runtime by BossController
+
+        string path = "Assets/Prefabs/Boss.prefab";
+        PrefabUtility.SaveAsPrefabAsset(boss, path);
+        Object.DestroyImmediate(boss);
+        Debug.Log("Boss prefab created.");
+    }
+
     // ==================== MAIN MENU SCENE ====================
 
     [MenuItem("Assassin/Create Main Menu Scene")]
@@ -712,8 +771,29 @@ public class ProjectSetup : EditorWindow
             SpawnEnemiesForLevel(enemyPrefab, levelName, enemyCount);
         }
 
+        // Spawn boss in Level 3 and enable shotgun
+        if (levelName == "Level3")
+        {
+            GameObject bossPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Boss.prefab");
+            if (bossPrefab != null)
+            {
+                GameObject boss = (GameObject)PrefabUtility.InstantiatePrefab(bossPrefab);
+                boss.transform.position = new Vector3(8f, 6f, 0f);
+                boss.name = "Boss_OMEGA";
+            }
+
+            // Enable shotgun on player
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                PlayerCombat combat = playerObj.GetComponent<PlayerCombat>();
+                if (combat != null) combat.shotgunEnabled = true;
+            }
+        }
+
         // Create HUD Canvas
-        CreateHUDCanvas();
+        bool isBossLevel = (levelName == "Level3");
+        CreateHUDCanvas(isBossLevel);
 
         // Create Minimap
         CreateMinimapCamera();
@@ -748,6 +828,9 @@ public class ProjectSetup : EditorWindow
                 break;
             case "Level2":
                 CreateLevel2Layout(levelParent.transform);
+                break;
+            case "Level3":
+                CreateLevel3Layout(levelParent.transform);
                 break;
         }
     }
@@ -792,6 +875,28 @@ public class ProjectSetup : EditorWindow
         CreateObstacle(parent, "Cover6", new Vector3(9f, 2f), new Vector2(2f, 1.8f));
         CreateObstacle(parent, "Cover7", new Vector3(-3f, -3f), new Vector2(1.8f, 1.8f));
         CreateObstacle(parent, "Cover8", new Vector3(5f, 7f), new Vector2(1.8f, 2f));
+    }
+
+    static void CreateLevel3Layout(Transform parent)
+    {
+        // Boss arena — open with scattered cover, walls create zones
+        CreateObstacle(parent, "Wall1", new Vector3(-6f, 0f), new Vector2(0.5f, 8f));
+        CreateObstacle(parent, "Wall2", new Vector3(6f, 0f), new Vector2(0.5f, 8f));
+        CreateObstacle(parent, "Wall3", new Vector3(0f, 5f), new Vector2(5f, 0.5f));
+        CreateObstacle(parent, "Wall4", new Vector3(0f, -5f), new Vector2(5f, 0.5f));
+        CreateObstacle(parent, "Wall5", new Vector3(-10f, 4f), new Vector2(3f, 0.5f));
+        CreateObstacle(parent, "Wall6", new Vector3(10f, -4f), new Vector2(3f, 0.5f));
+
+        // Cover — plenty for hiding from the boss
+        CreateObstacle(parent, "Cover1", new Vector3(-9f, -5f), new Vector2(2f, 2f));
+        CreateObstacle(parent, "Cover2", new Vector3(-3f, 3f), new Vector2(2f, 1.8f));
+        CreateObstacle(parent, "Cover3", new Vector3(3f, -3f), new Vector2(1.8f, 2f));
+        CreateObstacle(parent, "Cover4", new Vector3(9f, 5f), new Vector2(2f, 2f));
+        CreateObstacle(parent, "Cover5", new Vector3(-9f, 7f), new Vector2(1.8f, 1.8f));
+        CreateObstacle(parent, "Cover6", new Vector3(9f, -7f), new Vector2(1.8f, 1.8f));
+        CreateObstacle(parent, "Cover7", new Vector3(0f, 0f), new Vector2(2.2f, 2.2f));
+        CreateObstacle(parent, "Cover8", new Vector3(-3f, -7f), new Vector2(2f, 1.8f));
+        CreateObstacle(parent, "Cover9", new Vector3(3f, 7f), new Vector2(1.8f, 2f));
     }
 
     static void CreateRoom(Transform parent, string name, Vector3 pos, Vector2 size)
@@ -925,16 +1030,16 @@ public class ProjectSetup : EditorWindow
                 break;
             default: // Level3
                 positions = new Vector3[][] {
-                    new Vector3[] { new Vector3(-8f, 6f) },
-                    new Vector3[] { new Vector3(-3f, -4f) },
-                    new Vector3[] { new Vector3(3f, 3f) },
-                    new Vector3[] { new Vector3(8f, -2f) }
+                    new Vector3[] { new Vector3(-10f, 7f) },
+                    new Vector3[] { new Vector3(-10f, -6f) },
+                    new Vector3[] { new Vector3(10f, 7f) },
+                    new Vector3[] { new Vector3(10f, -6f) }
                 };
                 waypoints = new Vector3[][][] {
-                    new Vector3[][] { new Vector3[] { new Vector3(-8f, 6f), new Vector3(-8f, 3f) } },
-                    new Vector3[][] { new Vector3[] { new Vector3(-3f, -4f), new Vector3(-3f, -7f), new Vector3(-7f, -7f) } },
-                    new Vector3[][] { new Vector3[] { new Vector3(3f, 3f), new Vector3(3f, 7f), new Vector3(7f, 7f) } },
-                    new Vector3[][] { new Vector3[] { new Vector3(8f, -2f), new Vector3(8f, -5f), new Vector3(11f, -5f), new Vector3(11f, 1f) } }
+                    new Vector3[][] { new Vector3[] { new Vector3(-10f, 7f), new Vector3(-10f, 2f), new Vector3(-8f, 2f) } },
+                    new Vector3[][] { new Vector3[] { new Vector3(-10f, -6f), new Vector3(-10f, -2f), new Vector3(-8f, -2f) } },
+                    new Vector3[][] { new Vector3[] { new Vector3(10f, 7f), new Vector3(10f, 2f), new Vector3(8f, 2f) } },
+                    new Vector3[][] { new Vector3[] { new Vector3(10f, -6f), new Vector3(10f, -2f), new Vector3(8f, -2f) } }
                 };
                 break;
         }
@@ -971,7 +1076,7 @@ public class ProjectSetup : EditorWindow
 
     // ==================== HUD CANVAS ====================
 
-    static void CreateHUDCanvas()
+    static void CreateHUDCanvas(bool isBossLevel = false)
     {
         GameObject canvasObj = CreateCanvas("HUDCanvas");
         RectTransform canvasRect = canvasObj.GetComponent<RectTransform>();
@@ -1021,12 +1126,37 @@ public class ProjectSetup : EditorWindow
         uiManager.ammoText = ammoText;
 
         CreateTextElement(topRightGroup.transform, "ShootHint",
-            "PRESS [S] TO SHOOT", 9, new Color(1f, 0.6f, 0f, 0.4f), TextAlignmentOptions.Right,
-            new Vector2(-60, -35), new Vector2(160, 15));
+            "PRESS [S] TO SHOOT", 14, new Color(1f, 0.6f, 0f, 0.6f), TextAlignmentOptions.Right,
+            new Vector2(-60, -35), new Vector2(200, 20));
+
+        // ---- SHOTGUN AMMO (Boss level only) ----
+        if (isBossLevel)
+        {
+            GameObject shotgunBg = new GameObject("ShotgunBg");
+            shotgunBg.transform.SetParent(topRightGroup.transform);
+            RectTransform sgBgRect = shotgunBg.AddComponent<RectTransform>();
+            sgBgRect.anchoredPosition = new Vector2(-60, -65);
+            sgBgRect.sizeDelta = new Vector2(160, 45);
+            Image sgBgImg = shotgunBg.AddComponent<Image>();
+            sgBgImg.color = new Color(1f, 0.2f, 0.3f, 0.08f);
+            Outline sgBgOutline = shotgunBg.AddComponent<Outline>();
+            sgBgOutline.effectColor = new Color(1f, 0.2f, 0.3f, 0.25f);
+            sgBgOutline.effectDistance = new Vector2(1, 1);
+
+            TextMeshProUGUI sgText = CreateTextElement(shotgunBg.transform, "ShotgunAmmoText",
+                "SHOTGUN: 0", 22, new Color(1f, 0.2f, 0.3f), TextAlignmentOptions.Center,
+                Vector2.zero, new Vector2(150, 40));
+            uiManager.shotgunAmmoText = sgText;
+
+            CreateTextElement(topRightGroup.transform, "ShotgunHint",
+                "PRESS [A] TO SHOTGUN", 14, new Color(1f, 0.2f, 0.3f, 0.6f), TextAlignmentOptions.Right,
+                new Vector2(-60, -95), new Vector2(220, 20));
+        }
 
         // ---- RIGHT SIDE: COORDINATES ----
+        float coordsYOffset = isBossLevel ? -130f : -80f;
         GameObject rightGroup = CreateUIGroup(canvasObj.transform, "RightGroup",
-            TextAnchor.UpperRight, new Vector2(-20, -80));
+            TextAnchor.UpperRight, new Vector2(-20, coordsYOffset));
 
         TextMeshProUGUI latText = CreateTextElement(rightGroup.transform, "LatText",
             "LAT: 52.5200", 11, new Color(0f, 1f, 0.53f, 0.7f), TextAlignmentOptions.Right,
@@ -1160,11 +1290,20 @@ public class ProjectSetup : EditorWindow
         btnText.alignment = TextAlignmentOptions.Center;
         btnText.fontStyle = FontStyles.Bold;
 
+        // Briefing text (for boss fight instructions)
+        TextMeshProUGUI briefingText = CreateTextElement(winPanel.transform, "BriefingText",
+            "", 20, new Color(0.75f, 0.82f, 0.9f, 0.95f),
+            TextAlignmentOptions.Center, new Vector2(0, -30), new Vector2(750, 400));
+        briefingText.richText = true;
+        briefingText.gameObject.SetActive(false);
+
+        // Move button down when briefing is shown (handled at runtime)
         WinScreen winScreen = canvasObj.AddComponent<WinScreen>();
         winScreen.winPanel = winPanel;
         winScreen.winText = winText;
         winScreen.nextLevelButton = btnComp;
         winScreen.buttonText = btnText;
+        winScreen.briefingText = briefingText;
 
         // ---- GAME OVER SCREEN OVERLAY ----
         GameObject goPanel = new GameObject("GameOverPanel");
@@ -1261,6 +1400,8 @@ public class ProjectSetup : EditorWindow
         goScreen.sassText = goSass;
         goScreen.restartButton = restartBtnComp;
         goScreen.mainMenuButton = menuBtnComp;
+
+        // Boss lives are shown in world space on the boss itself
     }
 
     // ==================== MINIMAP ====================
@@ -1500,7 +1641,8 @@ public class ProjectSetup : EditorWindow
         string[] scenePaths = {
             "Assets/Scenes/MainMenu.unity",
             "Assets/Scenes/Level1.unity",
-            "Assets/Scenes/Level2.unity"
+            "Assets/Scenes/Level2.unity",
+            "Assets/Scenes/Level3.unity"
         };
 
         foreach (string path in scenePaths)

@@ -7,10 +7,12 @@ public class UIManager : MonoBehaviour
     [Header("Tactical Intel")]
     public TextMeshProUGUI killCounterText;
     public TextMeshProUGUI ammoText;
+    public TextMeshProUGUI shotgunAmmoText;
 
     [Header("Lives")]
     public Image[] fullHeartImages;
     public Image[] brokenHeartImages;
+
 
     [Header("Coordinates")]
     public TextMeshProUGUI latText;
@@ -79,11 +81,16 @@ public class UIManager : MonoBehaviour
 
     void UpdateAmmo()
     {
-        if (ammoText == null || playerTransform == null) return;
+        if (playerTransform == null) return;
 
         PlayerStats stats = playerTransform.GetComponent<PlayerStats>();
-        if (stats != null)
+        if (stats == null) return;
+
+        if (ammoText != null)
             ammoText.text = $"AMMO: {stats.ammo}";
+
+        if (shotgunAmmoText != null)
+            shotgunAmmoText.text = $"SHOTGUN: {stats.shotgunAmmo}";
     }
 
     void UpdateCoordinates()

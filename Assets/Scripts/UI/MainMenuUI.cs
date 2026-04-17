@@ -5,7 +5,7 @@ public class MainMenuUI : MonoBehaviour
 {
     public void OnPlayButton()
     {
-        SceneManager.LoadScene(1); // Level1 is index 1 in build settings
+        SceneManager.LoadScene(1); // Level1
     }
 
     public void OnQuitButton()
